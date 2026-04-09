@@ -494,8 +494,9 @@
     function hideMessage(){ document.getElementById('messageWrap').classList.add('hidden'); }
 
     /* ── Current weather ── */
-    function showWeather(data){
-      document.getElementById('cityName').textContent    = `${data.name}, ${data.sys.country}`;
+    function showWeather(data, koName){
+      const city = koName || data.name;
+      document.getElementById('cityName').textContent    = `${city}, ${data.sys.country}`;
       document.getElementById('dateTime').textContent    = nowString();
       document.getElementById('weatherIcon').textContent = icon(data.weather[0].icon);
       document.getElementById('temperature').textContent = `${Math.round(data.main.temp)}°C`;
@@ -759,16 +760,30 @@
       });
     }
 
+    /* ── 한글 지명 조회 ── */
+    async function getKoreanName(lat, lon) {
+      try {
+        const res = await fetch(`https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${API_KEY}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data[0]?.local_names?.ko || null;
+      } catch { return null; }
+    }
+
     /* ── 공통 렌더링 ── */
     async function renderWeather(wData, fData) {
       hideMessage();
-      showWeather(wData);
+      const {lat, lon} = wData.coord;
+
+      const [koName, aRes] = await Promise.all([
+        getKoreanName(lat, lon),
+        fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`),
+      ]);
+
+      showWeather(wData, koName);
       showForecast(fData.list);
       showToday(fData.list);
       showOutfit(wData.main.feels_like, wData.weather[0].id);
-
-      const {lat, lon} = wData.coord;
-      const aRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`);
       if(aRes.ok) showAirQuality(await aRes.json());
     }
 
@@ -800,8 +815,10 @@
         ]);
         if(!wRes.ok){ const e=await wRes.json(); throw new Error(e.message||'날씨 정보를 불러올 수 없습니다.'); }
         const wData = await wRes.json();
-        document.getElementById('cityInput').value = wData.name;
-        await renderWeather(wData, await fRes.json());
+        const fData = await fRes.json();
+        const koName = await getKoreanName(wData.coord.lat, wData.coord.lon);
+        document.getElementById('cityInput').value = koName || wData.name;
+        await renderWeather(wData, fData);
       } catch(err) {
         setMessage(`❌ 오류: ${err.message}`, true);
       }
