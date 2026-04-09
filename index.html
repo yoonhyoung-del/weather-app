@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>날씨 정보</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="날씨" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      padding: 28px 20px 48px;
+    }
+
+    /* ── Header ── */
+    .top {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    .search-bar input {
+      flex: 1;
+      padding: 11px 18px;
+      border-radius: 50px;
+      border: none;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s;
+    }
+    .search-bar input::placeholder { color: rgba(255,255,255,0.45); }
+    .search-bar input:focus { background: rgba(255,255,255,0.2); }
+
+    .search-bar button {
+      padding: 11px 22px;
+      border-radius: 50px;
+      border: none;
+      background: #e94560;
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .search-bar button:hover { background: #c73652; }
+    .search-bar button:active { transform: scale(0.97); }
+
+    .btn-location {
+      padding: 11px 16px;
+      border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-location:hover { background: rgba(255,255,255,0.2); }
+    .btn-location:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto;
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards (shared) ── */
+    .card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 20px;
+      padding: 22px 24px;
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .hidden { display: none; }
+
+    /* ── Current weather ── */
+    .current-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .city-name { font-size: 1.4rem; font-weight: 700; }
+    .date-time { font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-top: 3px; }
+
+    .current-body {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .w-icon {
+      font-size: 3.8rem;
+      animation: float 3s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+
+    .temp-block .temp { font-size: 3.2rem; font-weight: 800; line-height: 1; }
+    .temp-block .feels { font-size: 0.82rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+    .temp-block .desc  { font-size: 0.9rem; font-weight: 500; text-transform: capitalize; margin-top: 4px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .stat {
+      background: rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 10px 6px;
+      text-align: center;
+    }
+    .stat-icon  { font-size: 1.2rem; margin-bottom: 4px; }
+    .stat-value { font-size: 1rem; font-weight: 700; }
+    .stat-label { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+    /* ── AQI ── */
+    .aqi-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .aqi-circle {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-weight: 800; flex-shrink: 0;
+    }
+    .aqi-circle .aqi-num   { font-size: 1.4rem; line-height: 1; }
+    .aqi-circle .aqi-lbl   { font-size: 0.6rem; opacity: 0.85; margin-top: 1px; }
+
+    .aqi-good      { background: rgba(72,187,120,0.3);  border: 2px solid #48bb78; color: #9ae6b4; }
+    .aqi-fair      { background: rgba(154,230,180,0.2); border: 2px solid #9ae6b4; color: #c6f6d5; }
+    .aqi-moderate  { background: rgba(246,173,85,0.3);  border: 2px solid #f6ad55; color: #fbd38d; }
+    .aqi-poor      { background: rgba(252,129,74,0.3);  border: 2px solid #fc814a; color: #fed7aa; }
+    .aqi-very-poor { background: rgba(233,69,96,0.3);   border: 2px solid #e94560; color: #fca5a5; }
+
+    .aqi-info .aqi-status { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .aqi-info .aqi-advice { font-size: 0.8rem; color: rgba(255,255,255,0.6); line-height: 1.5; }
+
+    .aqi-bar-track {
+      height: 7px; border-radius: 4px;
+      background: linear-gradient(to right,#48bb78,#f6e05e,#f6ad55,#fc814a,#e94560);
+      position: relative; margin-bottom: 4px;
+    }
+    .aqi-bar-thumb {
+      position: absolute; top: 50%;
+      transform: translate(-50%,-50%);
+      width: 13px; height: 13px; border-radius: 50%;
+      background: #fff; box-shadow: 0 0 6px rgba(0,0,0,0.5);
+      transition: left 0.4s;
+    }
+    .aqi-bar-labels {
+      display: flex; justify-content: space-between;
+      font-size: 0.62rem; color: rgba(255,255,255,0.38);
+      margin-bottom: 14px;
+    }
+
+    .aqi-pollutants {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .aqi-pol {
+      background: rgba(255,255,255,0.06);
+      border-radius: 11px; padding: 8px 6px; text-align: center;
+    }
+    .pol-name  { font-size: 0.7rem;  color: rgba(255,255,255,0.45); margin-bottom: 3px; }
+    .pol-value { font-size: 0.95rem; font-weight: 700; }
+    .pol-unit  { font-size: 0.6rem;  color: rgba(255,255,255,0.35); margin-top: 1px; }
+    .c-ok   { color: #9ae6b4; }
+    .c-warn { color: #fbd38d; }
+    .c-bad  { color: #fca5a5; }
+
+    /* ── Today time-of-day forecast ── */
+    .periods {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .period-col {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 12px 6px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .period-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+    }
+    .period-sub {
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.38);
+    }
+
+    .period-icon { font-size: 1.6rem; }
+
+    .period-temp {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .period-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.55);
+    }
+
+    .period-desc {
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.3;
+    }
+
+    /* ── Outfit ── */
+    .outfit-condition {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .outfit-tip {
+      font-size: 0.8rem;
+      color: rgba(255,200,100,0.9);
+      background: rgba(255,180,0,0.1);
+      border: 1px solid rgba(255,180,0,0.25);
+      border-radius: 10px;
+      padding: 7px 12px;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .outfit-options { display: flex; flex-direction: column; gap: 10px; }
+
+    .outfit-option {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      padding: 11px 14px;
+    }
+
+    .outfit-badge {
+      display: inline-block;
+      font-size: 0.7rem; font-weight: 700;
+      padding: 2px 10px; border-radius: 50px;
+      letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .badge-casual  { background: rgba(99,179,237,0.25); color: #90cdf4; }
+    .badge-office  { background: rgba(154,117,250,0.25); color: #c4b5fd; }
+    .badge-outdoor { background: rgba(72,187,120,0.25); color: #9ae6b4; }
+
+    .outfit-items { display: flex; flex-wrap: wrap; gap: 5px; }
+    .outfit-item {
+      background: rgba(255,255,255,0.1);
+      border-radius: 50px;
+      padding: 3px 11px;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.85);
+    }
+    .outfit-item.essential {
+      background: rgba(233,69,96,0.18);
+      border: 1px solid rgba(233,69,96,0.4);
+      color: #fca5a5;
+    }
+
+    /* ── 5-day forecast ── */
+    .forecast-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .fc-day {
+      background: rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 11px 6px;
+      text-align: center;
+    }
+    .fc-day-name { font-size: 0.75rem; color: rgba(255,255,255,0.55); margin-bottom: 5px; }
+    .fc-icon     { font-size: 1.5rem; margin-bottom: 5px; }
+    .fc-high     { font-size: 0.95rem; font-weight: 700; }
+    .fc-low      { font-size: 0.75rem; color: rgba(255,255,255,0.45); }
+
+    /* ── Message / Error ── */
+    .message-wrap {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: center;
+    }
+
+    .message {
+      background: rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px 32px;
+      text-align: center;
+      color: rgba(255,255,255,0.7);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .message.error { border: 1px solid rgba(233,69,96,0.4); color: #e94560; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <h1>🌤 날씨 정보</h1>
+    <div class="search-bar">
+      <button class="btn-location" id="btnLocation" onclick="fetchByLocation()" title="현재 위치로 검색">📍</button>
+      <input id="cityInput" type="text" placeholder="도시 이름 입력 (예: Seoul, Tokyo, New York)" />
+      <button onclick="fetchWeather()">검색</button>
+    </div>
+  </div>
+
+  <div class="grid" id="mainGrid">
+
+    <!-- ①  message before search -->
+    <div class="message-wrap" id="messageWrap">
+      <div class="message" id="messageBox">
+        도시 이름을 입력하고 검색하세요.<br/>
+        <small>예: Seoul, London, New York</small>
+      </div>
+    </div>
+
+    <!-- ── LEFT COLUMN ── -->
+
+    <!-- Current weather -->
+    <div class="card hidden" id="weatherCard">
+      <div class="card-title">🌡 현재 날씨</div>
+      <div class="current-top">
+        <div>
+          <div class="city-name" id="cityName">—</div>
+          <div class="date-time" id="dateTime">—</div>
+        </div>
+      </div>
+      <div class="current-body">
+        <div class="w-icon" id="weatherIcon">☀️</div>
+        <div class="temp-block">
+          <div class="temp" id="temperature">—°C</div>
+          <div class="feels" id="feelsLike">체감 —°C</div>
+          <div class="desc" id="description">—</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-icon">💧</div>
+          <div class="stat-value" id="humidity">—%</div>
+          <div class="stat-label">습도</div>
+        </div>
+        <div class="stat">
+          <div class="stat-icon">💨</div>
+          <div class="stat-value" id="wind">—m/s</div>
+          <div class="stat-label">바람</div>
+        </div>
+        <div class="stat">
+          <div class="stat-icon">👁</div>
+          <div class="stat-value" id="visibility">—km</div>
+          <div class="stat-label">가시거리</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AQI -->
+    <div class="card hidden" id="aqiCard">
+      <div class="card-title">💨 공기질 (AQI)</div>
+      <div class="aqi-main">
+        <div class="aqi-circle" id="aqiBadge">
+          <span class="aqi-num" id="aqiNum">—</span>
+          <span class="aqi-lbl">AQI</span>
+        </div>
+        <div class="aqi-info">
+          <div class="aqi-status" id="aqiStatus">—</div>
+          <div class="aqi-advice" id="aqiAdvice">—</div>
+        </div>
+      </div>
+      <div class="aqi-bar-track"><div class="aqi-bar-thumb" id="aqiThumb"></div></div>
+      <div class="aqi-bar-labels"><span>좋음</span><span>보통</span><span>나쁨</span><span>매우나쁨</span><span>위험</span></div>
+      <div class="aqi-pollutants" id="aqiPollutants"></div>
+    </div>
+
+    <!-- ── RIGHT COLUMN ── -->
+
+    <!-- Today time-of-day -->
+    <div class="card hidden" id="todayCard" style="grid-row: span 2;">
+      <div class="card-title">🕐 오늘의 시간대별 날씨</div>
+      <div class="periods" id="periodsGrid"></div>
+    </div>
+
+    <!-- Outfit -->
+    <div class="card hidden" id="outfitCard" style="grid-column: 1 / -1;">
+      <div class="card-title">👗 오늘의 옷차림 추천</div>
+      <div class="outfit-condition" id="outfitCondition">—</div>
+      <div class="outfit-tip" id="outfitTip"></div>
+      <div class="outfit-options" id="outfitOptions"
+           style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;"></div>
+    </div>
+
+    <!-- 5-day forecast -->
+    <div class="card hidden" id="forecastCard" style="grid-column: 1 / -1;">
+      <div class="card-title">📅 5일 예보</div>
+      <div class="forecast-row" id="forecastGrid"></div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <script>
+    const API_KEY = '51f09adc62abcfd753cd229da8c82e42';
+
+    const WEATHER_ICONS = {
+      '01d':'☀️','01n':'🌙','02d':'⛅','02n':'☁️','03d':'☁️','03n':'☁️',
+      '04d':'☁️','04n':'☁️','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧',
+      '11d':'⛈','11n':'⛈','13d':'❄️','13n':'❄️','50d':'🌫','50n':'🌫',
+    };
+    const DAYS = ['일','월','화','수','목','금','토'];
+
+    function icon(code){ return WEATHER_ICONS[code] || '🌡'; }
+    function pad(n){ return String(n).padStart(2,'0'); }
+
+    function nowString(){
+      const d = new Date();
+      return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function setMessage(text, isError=false){
+      const wrap = document.getElementById('messageWrap');
+      const box  = document.getElementById('messageBox');
+      wrap.classList.remove('hidden');
+      box.innerHTML = text;
+      box.className = 'message' + (isError ? ' error' : '');
+    }
+
+    function hideMessage(){ document.getElementById('messageWrap').classList.add('hidden'); }
+
+    /* ── Current weather ── */
+    function showWeather(data){
+      document.getElementById('cityName').textContent    = `${data.name}, ${data.sys.country}`;
+      document.getElementById('dateTime').textContent    = nowString();
+      document.getElementById('weatherIcon').textContent = icon(data.weather[0].icon);
+      document.getElementById('temperature').textContent = `${Math.round(data.main.temp)}°C`;
+      document.getElementById('feelsLike').textContent   = `체감 ${Math.round(data.main.feels_like)}°C`;
+      document.getElementById('description').textContent = data.weather[0].description;
+      document.getElementById('humidity').textContent    = `${data.main.humidity}%`;
+      document.getElementById('wind').textContent        = `${data.wind.speed}m/s`;
+      document.getElementById('visibility').textContent  = `${((data.visibility||0)/1000).toFixed(1)}km`;
+      document.getElementById('weatherCard').classList.remove('hidden');
+    }
+
+    /* ── AQI ── */
+    function showAirQuality(data){
+      const aqi = data.list[0].main.aqi;
+      const c   = data.list[0].components;
+      const lv  = [
+        {label:'좋음',    cls:'aqi-good',      advice:'공기가 매우 깨끗합니다. 야외 활동에 최적이에요.'},
+        {label:'보통',    cls:'aqi-fair',      advice:'대체로 양호합니다. 민감군은 장시간 야외 활동 시 주의하세요.'},
+        {label:'나쁨',    cls:'aqi-moderate',  advice:'민감군(어린이·노약자·호흡기 질환자)은 야외 활동을 줄이세요.'},
+        {label:'매우나쁨', cls:'aqi-poor',      advice:'마스크 착용을 권장합니다. 가급적 실내에 머무르세요.'},
+        {label:'위험',    cls:'aqi-very-poor', advice:'외출을 삼가고 창문을 닫으세요. 마스크 필수 착용!'},
+      ][aqi-1];
+
+      const badge = document.getElementById('aqiBadge');
+      badge.className = 'aqi-circle ' + lv.cls;
+      document.getElementById('aqiNum').textContent    = aqi;
+      document.getElementById('aqiStatus').textContent = lv.label;
+      document.getElementById('aqiAdvice').textContent = lv.advice;
+      document.getElementById('aqiThumb').style.left   = ((aqi-1)/4*100)+'%';
+
+      function grade(v,ok,warn){ return v<=ok?'c-ok':v<=warn?'c-warn':'c-bad'; }
+      const pols = [
+        {name:'PM2.5', val:c.pm2_5, unit:'µg/m³', cls:grade(c.pm2_5,15,35)},
+        {name:'PM10',  val:c.pm10,  unit:'µg/m³', cls:grade(c.pm10,30,80)},
+        {name:'NO₂',   val:c.no2,   unit:'µg/m³', cls:grade(c.no2,40,200)},
+        {name:'O₃',    val:c.o3,    unit:'µg/m³', cls:grade(c.o3,60,120)},
+        {name:'SO₂',   val:c.so2,   unit:'µg/m³', cls:grade(c.so2,20,80)},
+        {name:'CO',    val:c.co,    unit:'µg/m³', cls:grade(c.co,4000,10000)},
+      ];
+      document.getElementById('aqiPollutants').innerHTML = pols.map(p=>`
+        <div class="aqi-pol">
+          <div class="pol-name">${p.name}</div>
+          <div class="pol-value ${p.cls}">${Math.round(p.val)}</div>
+          <div class="pol-unit">${p.unit}</div>
+        </div>`).join('');
+
+      document.getElementById('aqiCard').classList.remove('hidden');
+    }
+
+    /* ── Today time-of-day (5 periods) ── */
+    const PERIOD_DEF = [
+      { label:'새벽', sub:'00~06시', targetHour:3  },
+      { label:'아침', sub:'06~10시', targetHour:7  },
+      { label:'낮',   sub:'10~15시', targetHour:12 },
+      { label:'저녁', sub:'15~20시', targetHour:17 },
+      { label:'밤',   sub:'20~24시', targetHour:21 },
+    ];
+
+    function showToday(list){
+      // Filter today's entries
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+
+      // Build a map hour→item for today (also use tomorrow for late hours if missing)
+      const hourMap = {};
+      list.forEach(item => {
+        const d   = new Date(item.dt * 1000);
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if(key === todayStr) hourMap[d.getHours()] = item;
+      });
+
+      // If today has very few entries (searched late at night), also pull next 24h
+      const allByHour = {};
+      list.slice(0, 16).forEach(item => {
+        const d = new Date(item.dt * 1000);
+        allByHour[item.dt] = item;
+      });
+
+      function closest(targetHour){
+        // Try today first
+        let best = null, bestDiff = Infinity;
+        Object.entries(hourMap).forEach(([h, item]) => {
+          const diff = Math.abs(Number(h) - targetHour);
+          if(diff < bestDiff){ bestDiff = diff; best = item; }
+        });
+        if(best) return best;
+        // Fallback: pick from first 16 forecast entries
+        list.slice(0,16).forEach(item => {
+          const d = new Date(item.dt*1000);
+          const diff = Math.abs(d.getHours() - targetHour);
+          if(diff < bestDiff){ bestDiff = diff; best = item; }
+        });
+        return best;
+      }
+
+      document.getElementById('periodsGrid').innerHTML = PERIOD_DEF.map(pd => {
+        const item = closest(pd.targetHour);
+        if(!item) return '';
+        const t   = Math.round(item.main.temp);
+        const hum = item.main.humidity;
+        const desc= item.weather[0].description;
+        const ic  = icon(item.weather[0].icon);
+        const pop = Math.round((item.pop||0)*100);
+        const wind= item.wind.speed;
+
+        return `
+        <div class="period-col">
+          <div class="period-label">${pd.label}</div>
+          <div class="period-sub">${pd.sub}</div>
+          <div class="period-icon">${ic}</div>
+          <div class="period-temp">${t}°C</div>
+          <div class="period-stats">
+            <span>💧 ${hum}%</span>
+            <span>🌂 ${pop}%</span>
+            <span>💨 ${wind}m/s</span>
+          </div>
+          <div class="period-desc">${desc}</div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('todayCard').classList.remove('hidden');
+    }
+
+    /* ── 5-day forecast ── */
+    function showForecast(list){
+      const dailyMap = {};
+      list.forEach(item=>{
+        const d   = new Date(item.dt*1000);
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        const h   = d.getHours();
+        if(!dailyMap[key] || Math.abs(h-12) < Math.abs(new Date(dailyMap[key].dt*1000).getHours()-12))
+          dailyMap[key] = item;
+      });
+      const days = Object.values(dailyMap).slice(0,5);
+      document.getElementById('forecastGrid').innerHTML = days.map(item=>{
+        const d = new Date(item.dt*1000);
+        return `
+        <div class="fc-day">
+          <div class="fc-day-name">${DAYS[d.getDay()]}요일</div>
+          <div class="fc-icon">${icon(item.weather[0].icon)}</div>
+          <div class="fc-high">${Math.round(item.main.temp_max)}°</div>
+          <div class="fc-low">${Math.round(item.main.temp_min)}°</div>
+        </div>`;
+      }).join('');
+      document.getElementById('forecastCard').classList.remove('hidden');
+    }
+
+    /* ── Outfit ── */
+    function getOutfit(temp, weatherId){
+      const isRain    = weatherId>=500 && weatherId<600;
+      const isSnow    = weatherId>=600 && weatherId<700;
+      const isThunder = weatherId>=200 && weatherId<300;
+      const isFoggy   = weatherId>=700 && weatherId<800;
+      let condition, tip, options;
+
+      if(isThunder){
+        condition='⛈ 천둥번개 — 외출 시 안전에 유의하세요';
+        tip='⚡ 번개가 치는 날에는 야외 활동을 자제하고, 우산보다 방수 재킷을 권장합니다.';
+        options=[
+          {badge:'casual', items:['방수 후드집업','긴 바지','방수 운동화'], essential:['휴대용 우산']},
+          {badge:'office', items:['방수 트렌치코트','슬랙스','방수 구두'], essential:['접이식 우산']},
+          {badge:'outdoor',items:['방수 고어텍스 재킷','등산 바지','방수 트레킹화'], essential:['우비','방수 가방']},
+        ];
+      } else if(isSnow){
+        condition='❄️ 눈 — 미끄럼에 주의하세요';
+        tip='🧊 눈길·빙판길 대비 미끄럼 방지 신발을 착용하고, 체온 유지에 신경 쓰세요.';
+        options=[
+          {badge:'casual', items:['두꺼운 패딩','기모 후드티','기모 청바지','방한 부츠'], essential:['털모자','장갑']},
+          {badge:'office', items:['롱 울코트','두꺼운 니트','두꺼운 슬랙스','방한 앵클부츠'], essential:['목도리','핫팩']},
+          {badge:'outdoor',items:['방한 패딩 재킷','기능성 내복','방수 등산 바지','방수 방한 부츠'], essential:['장갑','핫팩','털모자']},
+        ];
+      } else if(isRain){
+        condition='🌧 비 — 우산을 꼭 챙기세요';
+        tip='💧 습도가 높아 불쾌지수가 오를 수 있어요. 통기성 좋은 소재를 선택하세요.';
+        options=[
+          {badge:'casual', items:['방수 바람막이','긴 바지','방수 운동화'], essential:['우산']},
+          {badge:'office', items:['방수 트렌치코트','슬랙스','방수 로퍼'], essential:['장우산']},
+          {badge:'outdoor',items:['방수 고어텍스 재킷','속건 바지','방수 트레킹화'], essential:['우비 또는 판초']},
+        ];
+      } else if(isFoggy){
+        condition='🌫 안개 — 가시거리가 낮습니다';
+        tip='👁 안개 속 이동 시 밝은 색 또는 반사 소재 착용을 권장합니다.';
+        options=[
+          {badge:'casual', items:['밝은 색 후드티','긴 바지','운동화'], essential:[]},
+          {badge:'office', items:['밝은 색 코트','슬랙스','구두'], essential:[]},
+          {badge:'outdoor',items:['밝은 색 바람막이','긴 바지','운동화'], essential:['반사 조끼 또는 밴드']},
+        ];
+      } else if(temp>=28){
+        condition='🥵 매우 더움 (28°C 이상) — 최대한 시원하게!';
+        tip='☀️ 자외선 차단제 필수! 수분 보충을 자주 하고 통기성 좋은 소재를 입으세요.';
+        options=[
+          {badge:'casual', items:['민소매 또는 반팔','반바지','샌들'], essential:['모자','선글라스']},
+          {badge:'office', items:['반팔 셔츠','린넨 슬랙스','로퍼'], essential:['휴대용 선풍기']},
+          {badge:'outdoor',items:['기능성 반팔','반바지','러닝화'], essential:['모자','선글라스','자외선차단제']},
+        ];
+      } else if(temp>=23){
+        condition='😊 따뜻함 (23~27°C) — 가볍게 입기 좋아요';
+        tip='🌤 일교차가 있을 수 있으니 얇은 겉옷 하나 챙겨두면 좋아요.';
+        options=[
+          {badge:'casual', items:['반팔 티셔츠','면바지 또는 반바지','운동화'], essential:[]},
+          {badge:'office', items:['반팔 셔츠 또는 블라우스','면 슬랙스','로퍼'], essential:['얇은 가디건 (실내용)']},
+          {badge:'outdoor',items:['기능성 반팔','조거 팬츠','운동화'], essential:['선글라스']},
+        ];
+      } else if(temp>=17){
+        condition='🍃 선선함 (17~22°C) — 얇은 겉옷을 추천해요';
+        tip='🌥 낮에는 따뜻하지만 아침·저녁으로 쌀쌀할 수 있어요.';
+        options=[
+          {badge:'casual', items:['긴팔 티셔츠','청바지','운동화'], essential:['얇은 가디건 또는 셔츠 자켓']},
+          {badge:'office', items:['긴팔 셔츠 또는 블라우스','슬랙스','구두'], essential:['얇은 재킷']},
+          {badge:'outdoor',items:['기능성 긴팔','조거 팬츠','운동화'], essential:['바람막이']},
+        ];
+      } else if(temp>=11){
+        condition='🍂 쌀쌀함 (11~16°C) — 재킷이 필요해요';
+        tip='🍁 일교차가 크니 탈착이 쉬운 레이어드 스타일을 추천해요.';
+        options=[
+          {badge:'casual', items:['긴팔 티셔츠','후드 집업 또는 가디건','청바지','운동화'], essential:[]},
+          {badge:'office', items:['셔츠 또는 블라우스','니트','슬랙스','로퍼 또는 구두'], essential:[]},
+          {badge:'outdoor',items:['기능성 긴팔','경량 플리스','등산 바지','트레킹화'], essential:[]},
+        ];
+      } else if(temp>=5){
+        condition='🧣 추움 (5~10°C) — 두꺼운 겉옷이 필요해요';
+        tip='🌬 바람이 불면 체감 온도가 더 낮아져요. 목도리로 목을 감싸주세요.';
+        options=[
+          {badge:'casual', items:['두꺼운 니트 또는 후드티','청바지','운동화 또는 부츠'], essential:['코트 또는 숏패딩','목도리']},
+          {badge:'office', items:['니트 또는 터틀넥','슬랙스','앵클부츠'], essential:['울코트','목도리']},
+          {badge:'outdoor',items:['기능성 내복','플리스','방풍 재킷','등산 바지','트레킹화'], essential:['장갑','비니']},
+        ];
+      } else {
+        condition='🥶 매우 추움 (4°C 이하) — 완전 방한이 필요해요';
+        tip='❄️ 기온이 매우 낮아요. 내복 착용과 핫팩을 꼭 챙기고, 노출 부위를 최소화하세요.';
+        options=[
+          {badge:'casual', items:['기모 내복','두꺼운 니트','기모 청바지','방한 부츠'], essential:['롱 패딩','털모자','장갑','목도리']},
+          {badge:'office', items:['기모 내복','두꺼운 니트 또는 터틀넥','두꺼운 슬랙스','방한 부츠'], essential:['롱 패딩 또는 무스탕','목도리','장갑']},
+          {badge:'outdoor',items:['기능성 내복 상하의','플리스','방수 방한 재킷','방수 방한 바지','방한 트레킹화'], essential:['방한 장갑','발라클라바','핫팩']},
+        ];
+      }
+      return {condition, tip, options};
+    }
+
+    function showOutfit(temp, weatherId){
+      const {condition, tip, options} = getOutfit(temp, weatherId);
+      document.getElementById('outfitCondition').textContent = condition;
+      document.getElementById('outfitTip').textContent = tip;
+      const labelMap = {casual:'캐주얼', office:'직장인', outdoor:'야외활동'};
+      document.getElementById('outfitOptions').innerHTML = options.map(opt=>`
+        <div class="outfit-option">
+          <span class="outfit-badge badge-${opt.badge}">${labelMap[opt.badge]}</span>
+          <div class="outfit-items">
+            ${opt.items.map(i=>`<span class="outfit-item">${i}</span>`).join('')}
+            ${opt.essential.map(i=>`<span class="outfit-item essential">⚠ ${i}</span>`).join('')}
+          </div>
+        </div>`).join('');
+      document.getElementById('outfitCard').classList.remove('hidden');
+    }
+
+    /* ── 공통 로딩 초기화 ── */
+    function startLoading(msg = '날씨 정보를 불러오는 중…') {
+      setMessage(msg);
+      ['weatherCard','aqiCard','todayCard','forecastCard','outfitCard'].forEach(id=>{
+        document.getElementById(id).classList.add('hidden');
+      });
+    }
+
+    /* ── 공통 렌더링 ── */
+    async function renderWeather(wData, fData) {
+      hideMessage();
+      showWeather(wData);
+      showForecast(fData.list);
+      showToday(fData.list);
+      showOutfit(wData.main.feels_like, wData.weather[0].id);
+
+      const {lat, lon} = wData.coord;
+      const aRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`);
+      if(aRes.ok) showAirQuality(await aRes.json());
+    }
+
+    /* ── 도시명 검색 ── */
+    async function fetchWeather() {
+      const city = document.getElementById('cityInput').value.trim();
+      if(!city){ setMessage('도시 이름을 입력해 주세요.'); return; }
+
+      startLoading();
+      try {
+        const [wRes, fRes] = await Promise.all([
+          fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric&lang=kr`),
+          fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric&lang=kr`),
+        ]);
+        if(!wRes.ok){ const e=await wRes.json(); throw new Error(e.message||'도시를 찾을 수 없습니다.'); }
+        await renderWeather(await wRes.json(), await fRes.json());
+      } catch(err) {
+        setMessage(`❌ 오류: ${err.message}`, true);
+      }
+    }
+
+    /* ── 좌표로 날씨 조회 ── */
+    async function fetchByCoords(lat, lon) {
+      startLoading('📍 현재 위치 날씨를 불러오는 중…');
+      try {
+        const [wRes, fRes] = await Promise.all([
+          fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=kr`),
+          fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=kr`),
+        ]);
+        if(!wRes.ok){ const e=await wRes.json(); throw new Error(e.message||'날씨 정보를 불러올 수 없습니다.'); }
+        const wData = await wRes.json();
+        document.getElementById('cityInput').value = wData.name;
+        await renderWeather(wData, await fRes.json());
+      } catch(err) {
+        setMessage(`❌ 오류: ${err.message}`, true);
+      }
+    }
+
+    /* ── 위치 버튼 클릭 ── */
+    function fetchByLocation() {
+      if(!('geolocation' in navigator)){
+        setMessage('❌ 이 브라우저는 위치 정보를 지원하지 않습니다.', true);
+        return;
+      }
+      const btn = document.getElementById('btnLocation');
+      btn.disabled = true;
+      btn.textContent = '⏳';
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          btn.disabled = false;
+          btn.textContent = '📍';
+          fetchByCoords(pos.coords.latitude, pos.coords.longitude);
+        },
+        err => {
+          btn.disabled = false;
+          btn.textContent = '📍';
+          const msg = err.code === 1
+            ? '위치 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.'
+            : '위치 정보를 가져올 수 없습니다.';
+          setMessage(`❌ ${msg}`, true);
+        },
+        { timeout: 8000 }
+      );
+    }
+
+    document.getElementById('cityInput').addEventListener('keydown', e=>{
+      if(e.key==='Enter') fetchWeather();
+    });
+
+    // 페이지 로드 시 자동으로 현재 위치 날씨 표시
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        pos => fetchByCoords(pos.coords.latitude, pos.coords.longitude),
+        ()  => {} // 거부 시 조용히 무시 (수동 검색 유도)
+      );
+    }
+
+    // PWA 서비스워커 등록
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>

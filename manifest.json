@@ -1,0 +1,13 @@
+{
+  "name": "날씨 정보",
+  "short_name": "날씨",
+  "description": "실시간 날씨, 공기질, 옷차림 추천 앱",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
