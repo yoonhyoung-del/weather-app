@@ -345,6 +345,60 @@
     .fc-high     { font-size: 0.95rem; font-weight: 700; }
     .fc-low      { font-size: 0.75rem; color: rgba(255,255,255,0.45); }
 
+    /* ── Calendar ── */
+    .cal-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .cal-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 11px 14px;
+    }
+
+    .cal-time {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      white-space: nowrap;
+      min-width: 52px;
+    }
+
+    .cal-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #e94560;
+      flex-shrink: 0;
+    }
+
+    .cal-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    .cal-empty {
+      text-align: center;
+      color: rgba(255,255,255,0.35);
+      font-size: 0.85rem;
+      padding: 16px 0;
+    }
+
+    .cal-key-wrap {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .cal-key-wrap input {
+      flex: 1; padding: 8px 14px; border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08); color: #fff;
+      font-size: 0.82rem; outline: none;
+    }
+    .cal-key-wrap input::placeholder { color: rgba(255,255,255,0.35); }
+    .cal-key-wrap button {
+      padding: 8px 16px; border-radius: 50px; border: none;
+      background: #e94560; color: #fff; font-size: 0.82rem; cursor: pointer;
+    }
+
     /* ── Message / Error ── */
     .message-wrap {
       grid-column: 1 / -1;
@@ -419,6 +473,14 @@
           <div class="stat-value" id="visibility">—km</div>
           <div class="stat-label">가시거리</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="card" id="calendarCard" style="grid-column: 1 / 2;">
+      <div class="card-title">📅 오늘의 일정</div>
+      <div class="cal-list" id="calList">
+        <div class="cal-empty">일정을 불러오는 중…</div>
       </div>
     </div>
 
@@ -536,13 +598,6 @@
         {name:'SO₂',   val:c.so2,   unit:'µg/m³', cls:grade(c.so2,20,80)},
         {name:'CO',    val:c.co,    unit:'µg/m³', cls:grade(c.co,4000,10000)},
       ];
-      document.getElementById('aqiPollutants').innerHTML = pols.map(p=>`
-        <div class="aqi-pol">
-          <div class="pol-name">${p.name}</div>
-          <div class="pol-value ${p.cls}">${Math.round(p.val)}</div>
-          <div class="pol-unit">${p.unit}</div>
-        </div>`).join('');
-
       document.getElementById('aqiCard').classList.remove('hidden');
     }
 
@@ -608,11 +663,6 @@
           <div class="period-sub">${pd.sub}</div>
           <div class="period-icon">${ic}</div>
           <div class="period-temp">${t}°C</div>
-          <div class="period-stats">
-            <span>💧 ${hum}%</span>
-            <span>🌂 ${pop}%</span>
-            <span>💨 ${wind}m/s</span>
-          </div>
           <div class="period-desc">${desc}</div>
         </div>`;
       }).join('');
@@ -850,6 +900,35 @@
         { timeout: 8000 }
       );
     }
+
+    /* ── Google Calendar ── */
+    async function loadCalendarEvents() {
+      try {
+        const res = await fetch('/api/calendar');
+        if (!res.ok) throw new Error();
+        const events = await res.json();
+        renderCalEvents(events);
+      } catch {
+        document.getElementById('calList').innerHTML =
+          '<div class="cal-empty">일정을 불러오지 못했습니다.</div>';
+      }
+    }
+
+    function renderCalEvents(events) {
+      const list = document.getElementById('calList');
+      if (!events.length) {
+        list.innerHTML = '<div class="cal-empty">오늘 일정이 없습니다 🎉</div>';
+        return;
+      }
+      list.innerHTML = events.map(ev => `
+        <div class="cal-item">
+          <div class="cal-time">${ev.timeStr}</div>
+          <div class="cal-dot"></div>
+          <div class="cal-title">${ev.summary}</div>
+        </div>`).join('');
+    }
+
+    loadCalendarEvents();
 
     document.getElementById('cityInput').addEventListener('keydown', e=>{
       if(e.key==='Enter') fetchWeather();
